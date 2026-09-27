@@ -5,12 +5,14 @@ import {
   ArrowUpRight,
   FileText,
   LoaderCircle,
+  LogOut,
   ShieldCheck,
   Sparkles,
   Upload,
   X,
 } from 'lucide-react'
-import { scoreResume, type ScoreResult } from './api'
+import { clearToken, fetchCurrentUser, scoreResume, type AuthUser, type ScoreResult } from './api'
+import { AuthModal, type AuthMode } from './AuthModal'
 import { SampleScoreCard } from './SampleScoreCard'
 import { ScoreResultCard } from './ScoreResultCard'
 
@@ -33,6 +35,24 @@ function App() {
   const [isScoring, setIsScoring] = useState(false)
   const [result, setResult] = useState<ScoreResult | null>(null)
   const resultRef = useRef<HTMLDivElement>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null)
+
+  useEffect(() => {
+    fetchCurrentUser()
+      .then(setUser)
+      .catch((err: unknown) => console.error('[Auth] could not restore session', err))
+  }, [])
+
+  function handleAuthenticated(nextUser: AuthUser) {
+    setUser(nextUser)
+    setAuthMode(null)
+  }
+
+  function logOut() {
+    clearToken()
+    setUser(null)
+  }
 
   useEffect(() => {
     if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -112,10 +132,27 @@ function App() {
           <a className="transition-colors hover:text-[#232620]" href="#your-privacy">Your privacy</a>
         </nav>
 
-        <a href="#upload" className="inline-flex items-center gap-2 rounded-full bg-[#303a34] px-4 py-2.5 text-[12px] font-semibold text-white transition-transform hover:-translate-y-0.5 sm:px-5 sm:text-[13px]">
-          Get your score <ArrowUpRight size={15} />
-        </a>
+        <div className="flex items-center gap-2 sm:gap-3">
+          {user ? (
+            <>
+              <span className="hidden max-w-[180px] truncate text-[12px] font-medium text-[#55584f] md:inline" title={user.email}>{user.email}</span>
+              <button type="button" onClick={logOut} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2.5 text-[12px] font-semibold text-[#55584f] transition-colors hover:bg-[#efebe4] hover:text-[#232620] sm:text-[13px]">
+                <LogOut size={14} /> Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => setAuthMode('login')} className="rounded-full px-3 py-2.5 text-[12px] font-semibold text-[#55584f] transition-colors hover:bg-[#efebe4] hover:text-[#232620] sm:text-[13px]">Log in</button>
+              <button type="button" onClick={() => setAuthMode('signup')} className="hidden rounded-full border border-[#d8d3c9] px-4 py-2.5 text-[12px] font-semibold text-[#232620] transition-colors hover:border-[#232620] sm:inline-flex sm:text-[13px]">Sign up</button>
+            </>
+          )}
+          <a href="#upload" className="inline-flex items-center gap-2 rounded-full bg-[#303a34] px-4 py-2.5 text-[12px] font-semibold text-white transition-transform hover:-translate-y-0.5 sm:px-5 sm:text-[13px]">
+            Get your score <ArrowUpRight size={15} />
+          </a>
+        </div>
       </header>
+
+      <AuthModal mode={authMode} onModeChange={setAuthMode} onClose={() => setAuthMode(null)} onAuthenticated={handleAuthenticated} />
 
       <main id="top" className="mx-auto max-w-[1240px] px-5 pb-16 sm:px-8 lg:px-12">
         <section className="grid items-center gap-10 pb-16 pt-10 sm:pt-14 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16 lg:pb-24 lg:pt-20">
@@ -127,7 +164,7 @@ function App() {
               Hey, your next job starts <span className="relative inline-block whitespace-nowrap text-[#d85e42]">right here<span className="absolute -bottom-1 left-0 -z-0 h-[5px] w-full rounded-full bg-[#e9cc82] sm:bottom-0 sm:h-[7px]" /></span>.
             </h1>
             <p className="mt-6 max-w-[440px] text-[16px] leading-7 text-[#777970] sm:text-[17px]">
-              Get your resume reviewed and get a score. Find out whats working, what isnt, and where to focus next.
+              Get your resume reviewed and get a score. Find out whats working, what isnt, and where to focus next.
             </p>
 
             <form id="upload" onSubmit={handleSubmit} noValidate className="mt-9 scroll-mt-8">
