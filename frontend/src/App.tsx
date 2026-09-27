@@ -33,15 +33,14 @@ function App() {
   const [isScoring, setIsScoring] = useState(false)
   const [result, setResult] = useState<ScoreResult | null>(null)
   const resultRef = useRef<HTMLDivElement>(null)
-  // Bumped on every submit and file change so a slow response for an old file can't overwrite newer state.
-  const latestRequest = useRef(0)
 
   useEffect(() => {
     if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [result])
 
   function addFile(nextFile?: File) {
-    if (!nextFile) return
+    // Each score spends labd credits, so the file is locked until the current one returns.
+    if (!nextFile || isScoring) return
     if (!acceptedExtensions.test(nextFile.name)) {
       setError('Choose a PDF file to continue.')
       return
@@ -52,8 +51,6 @@ function App() {
     }
     setError('')
     setResult(null)
-    latestRequest.current += 1
-    setIsScoring(false)
     setFile(nextFile)
   }
 
@@ -70,8 +67,6 @@ function App() {
   function clearFile() {
     setFile(null)
     setResult(null)
-    latestRequest.current += 1
-    setIsScoring(false)
     setError('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -86,22 +81,19 @@ function App() {
       setError('Paste the job description you want to be scored against.')
       return
     }
-    if (jobDescription.length > maxJobDescriptionLength) {
+    if (jobDescription.trim().length > maxJobDescriptionLength) {
       setError(`The job description is too long. Keep it under ${maxJobDescriptionLength.toLocaleString('en-IN')} characters.`)
       return
     }
-    const requestId = ++latestRequest.current
     setError('')
     setIsScoring(true)
     try {
-      const nextResult = await scoreResume(file, jobDescription)
-      if (requestId === latestRequest.current) setResult(nextResult)
+      setResult(await scoreResume(file, jobDescription))
     } catch (err) {
-      if (requestId !== latestRequest.current) return
       setResult(null)
       setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
     } finally {
-      if (requestId === latestRequest.current) setIsScoring(false)
+      setIsScoring(false)
     }
   }
 
@@ -144,6 +136,7 @@ function App() {
                 className="sr-only"
                 type="file"
                 accept=".pdf,application/pdf"
+                disabled={isScoring}
                 onChange={handleFileChange}
                 aria-label="Choose your resume"
               />
@@ -163,7 +156,7 @@ function App() {
                       <p className="truncate text-[14px] font-semibold">{file.name}</p>
                       <p className="mt-1 text-[12px] text-[#85867d]">{formatFileSize(file.size)} · Ready to score</p>
                     </div>
-                    <button type="button" onClick={clearFile} title="Remove file" aria-label="Remove file" className="grid size-9 shrink-0 place-items-center rounded-full text-[#85867d] transition-colors hover:bg-[#efebe4] hover:text-[#232620]"><X size={17} /></button>
+                    <button type="button" onClick={clearFile} disabled={isScoring} title="Remove file" aria-label="Remove file" className="grid size-9 shrink-0 place-items-center rounded-full text-[#85867d] transition-colors hover:bg-[#efebe4] hover:text-[#232620] disabled:cursor-wait disabled:opacity-40"><X size={17} /></button>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center text-center sm:flex-row sm:text-left">
@@ -190,9 +183,9 @@ function App() {
               <button type="submit" disabled={isScoring} className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#303a34] px-6 py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#232620] disabled:cursor-wait disabled:opacity-70">
                 {isScoring ? <><LoaderCircle size={15} className="animate-spin" /> Scoring...</> : <>Score my resume <ArrowRight size={15} /></>}
               </button>
-              {isScoring && <p className="mt-3 text-[12px] text-[#85867d]">Reading your resume against the posting. This usually takes about 30 seconds.</p>}
+              {isScoring && <p role="status" className="mt-3 text-[12px] text-[#85867d]">Reading your resume against the posting. This usually takes about 30 seconds.</p>}
               {error && <p role="alert" className="mt-3 text-[13px] font-medium text-[#bd4c34]">{error}</p>}
-              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[#85867d]"><ShieldCheck size={13} /> We send your resume's text to our AI scoring service. Nothing is stored.</p>
+              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[#85867d]"><ShieldCheck size={13} /> Your resume's text and the job description are sent to labd, our AI scoring provider. We don't store either.</p>
             </form>
 
             <a href="#how-it-works" className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold text-[#55584f] transition-colors hover:text-[#d85e42]">
@@ -200,9 +193,10 @@ function App() {
             </a>
           </div>
 
-          <div ref={resultRef} aria-live="polite" className="animate-rise animation-delay-150 relative mx-auto w-full max-w-[490px] scroll-mt-8 lg:ml-auto">
+          <div ref={resultRef} className="animate-rise animation-delay-150 relative mx-auto w-full max-w-[490px] scroll-mt-8 lg:ml-auto">
             <div className="absolute -right-5 -top-6 -z-0 size-28 rounded-full bg-[#eee4d4] sm:-right-8 sm:-top-8 sm:size-36" />
             <div className="absolute -bottom-5 -left-5 -z-0 size-[74px] rounded-[24px] bg-[#dfe6dc] sm:-bottom-6 sm:-left-7 sm:size-[88px]" />
+            <p role="status" className="sr-only">{result ? `Your score: ${result.score} out of 100. ${result.summary}` : ''}</p>
             {result ? <ScoreResultCard result={result} /> : <SampleScoreCard />}
             {!result && <div className="absolute -right-2 top-[27%] hidden rotate-[5deg] items-center gap-2.5 rounded-[13px] border border-[#eeeae3] bg-[#fffefa] px-3.5 py-3 shadow-[0_8px_26px_-16px_rgba(43,47,37,0.35)] sm:flex">
               <span className="grid size-8 place-items-center rounded-[10px] bg-[#f8e8df] text-[#cb654b]"><Sparkles size={15} /></span>
@@ -240,7 +234,7 @@ function App() {
         <section id="your-privacy" className="flex flex-col justify-between gap-4 rounded-[18px] bg-[#303a34] px-5 py-5 text-white sm:flex-row sm:items-center sm:px-7">
           <div className="flex items-start gap-3.5">
             <span className="grid size-9 shrink-0 place-items-center rounded-[12px] bg-white/10 text-[#f5c966]"><ShieldCheck size={18} /></span>
-            <div><h2 className="font-display text-[13px] font-bold">Your resume stays yours.</h2><p className="mt-1 text-[11px] leading-[1.7] text-white/65">Only the text of your resume is sent for scoring. We don't save your file or your results.</p></div>
+            <div><h2 className="font-display text-[13px] font-bold">Your resume stays yours.</h2><p className="mt-1 text-[11px] leading-[1.7] text-white/65">We send your resume's text and the job description to labd, our AI scoring provider. We don't store your resume or your results.</p></div>
           </div>
           <a href="#upload" className="inline-flex shrink-0 items-center gap-2 text-[12px] font-semibold text-[#f5c966] transition-colors hover:text-white">Score your resume <ArrowUpRight size={15} /></a>
         </section>

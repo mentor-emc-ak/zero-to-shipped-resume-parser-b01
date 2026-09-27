@@ -3,8 +3,9 @@ import { Check, Info, Lightbulb, X } from 'lucide-react'
 import type { ScoreResult } from './api'
 
 function verdictFor(score: number) {
-  if (score >= 75) return { label: 'Strong match', headline: "You speak this job's language.", tone: 'bg-[#e7efe7] text-[#567260]' }
-  if (score >= 50) return { label: 'Partial match', headline: 'Close, with a few gaps.', tone: 'bg-[#f5eddd] text-[#9b7836]' }
+  // Bands follow the rubric the labd prompt scores against.
+  if (score >= 70) return { label: 'Strong match', headline: "You speak this job's language.", tone: 'bg-[#e7efe7] text-[#567260]' }
+  if (score >= 40) return { label: 'Partial match', headline: 'Close, with a few gaps.', tone: 'bg-[#f5eddd] text-[#9b7836]' }
   return { label: 'Needs work', headline: 'Worth tailoring for this role.', tone: 'bg-[#f8e8df] text-[#b5543c]' }
 }
 
@@ -49,7 +50,7 @@ export function ScoreResultCard({ result }: { result: ScoreResult }) {
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${verdict.tone}`}>{verdict.label}</span>
           <p className="mt-2.5 font-display text-[19px] font-bold leading-tight">{verdict.headline}</p>
           <p className="mt-1.5 text-[11px] text-[#898a80]">
-            {result.matchedSkills.length} of {result.matchedSkills.length + result.missingSkills.length} required skills found
+            {result.matchedSkills.length} of {result.matchedSkills.length + result.missingSkills.length} skills checked are on your resume
           </p>
         </div>
       </div>
