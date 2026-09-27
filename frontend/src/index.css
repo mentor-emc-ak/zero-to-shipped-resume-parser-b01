@@ -52,7 +52,8 @@ button {
 }
 
 .score-ring {
-  background: conic-gradient(#d85e42 0% 82%, #efeae1 82% 100%);
+  --score: 82%;
+  background: conic-gradient(#d85e42 0% var(--score), #efeae1 var(--score) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,18 +1,22 @@
-import { useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react'
 import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
   FileText,
+  LoaderCircle,
   ShieldCheck,
   Sparkles,
   Upload,
   X,
 } from 'lucide-react'
+import { scoreResume, type ScoreResult } from './api'
 import { SampleScoreCard } from './SampleScoreCard'
+import { ScoreResultCard } from './ScoreResultCard'
 
-const acceptedExtensions = /\.(pdf|doc|docx)$/i
-const maxFileSize = 20 * 1024 * 1024
+const acceptedExtensions = /\.pdf$/i
+const maxFileSize = 4 * 1024 * 1024
+const maxJobDescriptionLength = 20000
 
 function formatFileSize(bytes: number) {
   return bytes < 1024 * 1024
@@ -25,18 +29,27 @@ function App() {
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState('')
+  const [jobDescription, setJobDescription] = useState('')
+  const [isScoring, setIsScoring] = useState(false)
+  const [result, setResult] = useState<ScoreResult | null>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [result])
 
   function addFile(nextFile?: File) {
     if (!nextFile) return
     if (!acceptedExtensions.test(nextFile.name)) {
-      setError('Choose a PDF, DOC, or DOCX file to continue.')
+      setError('Choose a PDF file to continue.')
       return
     }
     if (nextFile.size > maxFileSize) {
-      setError('This file is over 20 MB. Try a smaller resume.')
+      setError('This file is over 4 MB. Try a smaller resume.')
       return
     }
     setError('')
+    setResult(null)
     setFile(nextFile)
   }
 
@@ -52,8 +65,30 @@ function App() {
 
   function clearFile() {
     setFile(null)
+    setResult(null)
     setError('')
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!file) {
+      setError('Add your resume first.')
+      return
+    }
+    if (!jobDescription.trim()) {
+      setError('Paste the job description you want to be scored against.')
+      return
+    }
+    setError('')
+    setIsScoring(true)
+    try {
+      setResult(await scoreResume(file, jobDescription))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
+    } finally {
+      setIsScoring(false)
+    }
   }
 
   return (
@@ -89,12 +124,12 @@ function App() {
               Get your resume reviewed and get a score. Find out whats working, what isnt, and where to focus next.
             </p>
 
-            <div id="upload" className="mt-9 scroll-mt-8">
+            <form id="upload" onSubmit={handleSubmit} noValidate className="mt-9 scroll-mt-8">
               <input
                 ref={fileInputRef}
                 className="sr-only"
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,application/pdf"
                 onChange={handleFileChange}
                 aria-label="Choose your resume"
               />
@@ -112,7 +147,7 @@ function App() {
                     <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[#f2e8dc] text-[#b76a4d]"><FileText size={22} /></span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-semibold">{file.name}</p>
-                      <p className="mt-1 text-[12px] text-[#85867d]">{formatFileSize(file.size)} · Ready for your sample review</p>
+                      <p className="mt-1 text-[12px] text-[#85867d]">{formatFileSize(file.size)} · Ready to score</p>
                     </div>
                     <button type="button" onClick={clearFile} title="Remove file" aria-label="Remove file" className="grid size-9 shrink-0 place-items-center rounded-full text-[#85867d] transition-colors hover:bg-[#efebe4] hover:text-[#232620]"><X size={17} /></button>
                   </div>
@@ -121,7 +156,7 @@ function App() {
                     <span className="mb-4 grid size-12 shrink-0 place-items-center rounded-[14px] bg-[#f2e8dc] text-[#b76a4d] sm:mb-0 sm:mr-5"><Upload size={21} strokeWidth={1.8} /></span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-semibold">Drop your resume here</p>
-                      <p className="mt-1 text-[12px] text-[#85867d]">PDF, DOC, or DOCX · up to 20 MB</p>
+                      <p className="mt-1 text-[12px] text-[#85867d]">PDF · up to 4 MB</p>
                     </div>
                     <button type="button" onClick={() => fileInputRef.current?.click()} className="mt-4 inline-flex shrink-0 items-center gap-2 rounded-full bg-[#d85e42] px-5 py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#bd4c34] sm:ml-4 sm:mt-0">
                       Choose a file <ArrowRight size={15} />
@@ -129,23 +164,36 @@ function App() {
                   </div>
                 )}
               </div>
+              <label htmlFor="job-description" className="mt-5 block text-[13px] font-semibold">Job description</label>
+              <textarea
+                id="job-description"
+                value={jobDescription}
+                onChange={(event) => setJobDescription(event.target.value)}
+                maxLength={maxJobDescriptionLength}
+                rows={6}
+                placeholder="Paste the full job posting here"
+                className="mt-2 block w-full resize-y rounded-[16px] border border-[#d8d3c9] bg-[#fbfaf7] px-4 py-3 text-[13px] leading-6 placeholder:text-[#a09d93] focus:border-[#d85e42] focus:outline-none"
+              />
+              <button type="submit" disabled={isScoring} className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#303a34] px-6 py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#232620] disabled:cursor-wait disabled:opacity-70">
+                {isScoring ? <><LoaderCircle size={15} className="animate-spin" /> Scoring...</> : <>Score my resume <ArrowRight size={15} /></>}
+              </button>
               {error && <p role="alert" className="mt-3 text-[13px] font-medium text-[#bd4c34]">{error}</p>}
-              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[#85867d]"><ShieldCheck size={13} /> Your file stays right here. Nothing gets uploaded.</p>
-            </div>
+              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[#85867d]"><ShieldCheck size={13} /> We read your resume to score it, then discard it. Nothing is stored.</p>
+            </form>
 
             <a href="#how-it-works" className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold text-[#55584f] transition-colors hover:text-[#d85e42]">
               A peek at your review <ArrowDown size={14} />
             </a>
           </div>
 
-          <div className="animate-rise animation-delay-150 relative mx-auto w-full max-w-[490px] lg:ml-auto">
+          <div ref={resultRef} className="animate-rise animation-delay-150 relative mx-auto w-full max-w-[490px] scroll-mt-8 lg:ml-auto">
             <div className="absolute -right-5 -top-6 -z-0 size-28 rounded-full bg-[#eee4d4] sm:-right-8 sm:-top-8 sm:size-36" />
             <div className="absolute -bottom-5 -left-5 -z-0 size-[74px] rounded-[24px] bg-[#dfe6dc] sm:-bottom-6 sm:-left-7 sm:size-[88px]" />
-            <SampleScoreCard />
-            <div className="absolute -right-2 top-[27%] hidden rotate-[5deg] items-center gap-2.5 rounded-[13px] border border-[#eeeae3] bg-[#fffefa] px-3.5 py-3 shadow-[0_8px_26px_-16px_rgba(43,47,37,0.35)] sm:flex">
+            {result ? <ScoreResultCard result={result} /> : <SampleScoreCard />}
+            {!result && <div className="absolute -right-2 top-[27%] hidden rotate-[5deg] items-center gap-2.5 rounded-[13px] border border-[#eeeae3] bg-[#fffefa] px-3.5 py-3 shadow-[0_8px_26px_-16px_rgba(43,47,37,0.35)] sm:flex">
               <span className="grid size-8 place-items-center rounded-[10px] bg-[#f8e8df] text-[#cb654b]"><Sparkles size={15} /></span>
               <div><p className="text-[10px] font-bold">One clear next step</p><p className="mt-0.5 text-[9px] text-[#898a80]">Make your impact easy to spot</p></div>
-            </div>
+            </div>}
           </div>
         </section>
 
@@ -159,8 +207,8 @@ function App() {
           </div>
           <div className="mt-9 grid gap-7 sm:grid-cols-3 sm:gap-8">
             {[
-              { number: '01', title: 'Add your resume', copy: 'Choose a PDF or Word document. It stays in your browser for this demo.', icon: Upload },
-              { number: '02', title: 'See what stands out', copy: 'Get a feel for the signals a good review can help you spot.', icon: Sparkles },
+              { number: '01', title: 'Add your resume', copy: "Choose a PDF and paste the job description you're aiming for.", icon: Upload },
+              { number: '02', title: 'See what stands out', copy: "See how much of the posting's language your resume already covers.", icon: Sparkles },
               { number: '03', title: 'Find your next move', copy: 'Focus on a few thoughtful edits instead of rewriting everything.', icon: ArrowUpRight },
             ].map((step) => (
               <article key={step.number} className="border-t border-[#dcd6cc] pt-4">
@@ -178,15 +226,15 @@ function App() {
         <section id="your-privacy" className="flex flex-col justify-between gap-4 rounded-[18px] bg-[#303a34] px-5 py-5 text-white sm:flex-row sm:items-center sm:px-7">
           <div className="flex items-start gap-3.5">
             <span className="grid size-9 shrink-0 place-items-center rounded-[12px] bg-white/10 text-[#f5c966]"><ShieldCheck size={18} /></span>
-            <div><h2 className="font-display text-[13px] font-bold">Your resume stays yours.</h2><p className="mt-1 text-[11px] leading-[1.7] text-white/65">This frontend demo doesnt upload, store, or analyze your file.</p></div>
+            <div><h2 className="font-display text-[13px] font-bold">Your resume stays yours.</h2><p className="mt-1 text-[11px] leading-[1.7] text-white/65">We read your resume to score it and discard it straight after. Nothing is saved.</p></div>
           </div>
-          <a href="#upload" className="inline-flex shrink-0 items-center gap-2 text-[12px] font-semibold text-[#f5c966] transition-colors hover:text-white">Try the demo <ArrowUpRight size={15} /></a>
+          <a href="#upload" className="inline-flex shrink-0 items-center gap-2 text-[12px] font-semibold text-[#f5c966] transition-colors hover:text-white">Score your resume <ArrowUpRight size={15} /></a>
         </section>
       </main>
 
       <footer className="mx-auto flex max-w-[1240px] flex-col justify-between gap-2 px-5 pb-7 text-[10px] text-[#929187] sm:flex-row sm:items-center sm:px-8 lg:px-12">
         <span>noted. A friendlier first look at your next move.</span>
-        <span>Frontend demo · Sample feedback only</span>
+        <span>Scores are keyword-based guidance, not a hiring decision</span>
       </footer>
     </div>
   )
