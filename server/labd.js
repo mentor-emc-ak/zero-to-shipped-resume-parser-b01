@@ -36,7 +36,10 @@ async function chat(messages) {
     });
   } catch (err) {
     console.error(`[Labd] request failed: ${err.name} ${err.message}`);
-    throw new LabdError(504, 'Scoring took too long. Try again.');
+    if (err.name === 'TimeoutError') {
+      throw new LabdError(504, 'Scoring took too long. Try again.');
+    }
+    throw new LabdError(503, UNAVAILABLE);
   }
 
   if (!res.ok) {

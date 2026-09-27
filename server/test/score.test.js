@@ -25,6 +25,26 @@ test('parseScoreReply strips a markdown code fence', () => {
   assert.deepEqual(parseScoreReply('```json\n' + JSON.stringify(REPLY) + '\n```'), REPLY);
 });
 
+test('parseScoreReply reads JSON wrapped in a sentence of preamble', () => {
+  assert.deepEqual(parseScoreReply('Here is the result:\n' + JSON.stringify(REPLY)), REPLY);
+});
+
+test('parseScoreReply dedupes lists and caps what a reply can carry', () => {
+  const result = parseScoreReply(
+    JSON.stringify({
+      ...REPLY,
+      summary: 'x'.repeat(5000),
+      matchedSkills: ['AWS', 'AWS', ...Array.from({ length: 20 }, (_, i) => `Skill ${i}`)],
+      suggestions: Array.from({ length: 10 }, (_, i) => `Do ${i} ${'y'.repeat(1000)}`),
+    })
+  );
+  assert.equal(result.summary.length, 600);
+  assert.equal(result.matchedSkills.length, 12);
+  assert.equal(result.matchedSkills.filter((skill) => skill === 'AWS').length, 1);
+  assert.equal(result.suggestions.length, 4);
+  assert.ok(result.suggestions.every((suggestion) => suggestion.length <= 300));
+});
+
 test('parseScoreReply rejects prose, out-of-range scores and missing fields', () => {
   assert.equal(parseScoreReply('The candidate is a good fit.'), null);
   assert.equal(parseScoreReply(JSON.stringify({ ...REPLY, score: 140 })), null);
@@ -57,6 +77,7 @@ test.before(async () => {
 test.beforeEach(() => {
   process.env.LABD_AI_KEY = 'test-key';
   labdCalls = [];
+  console.error.mock.resetCalls();
   labdResponse = () =>
     Response.json({ message: { role: 'assistant', content: JSON.stringify(REPLY) }, credits: { percentLeft: 90 } });
 });
@@ -91,11 +112,35 @@ test('POST /api/score returns the labd score for a PDF and JD', async () => {
   assert.match(prompt, /own PostgreSQL schemas/);
 });
 
-test('POST /api/score maps a used-up labd allowance to 503', async () => {
-  labdResponse = () => new Response('Payment required', { status: 402 });
+for (const labdStatus of [401, 402, 403]) {
+  test(`POST /api/score maps labd HTTP ${labdStatus} to 503`, async () => {
+    labdResponse = () => new Response('No', { status: labdStatus });
+    const { status, body } = await postScore(scoreForm({ pdfText: 'Resume', jobDescription: JD }));
+    assert.equal(status, 503);
+    assert.match(body.error, /unavailable/);
+  });
+}
+
+test('POST /api/score returns 504 when labd times out', async () => {
+  labdResponse = () => Promise.reject(new DOMException('timed out', 'TimeoutError'));
+  const { status, body } = await postScore(scoreForm({ pdfText: 'Resume', jobDescription: JD }));
+  assert.equal(status, 504);
+  assert.match(body.error, /too long/);
+});
+
+test('POST /api/score returns 503 when labd is unreachable', async () => {
+  labdResponse = () => Promise.reject(new TypeError('fetch failed'));
   const { status, body } = await postScore(scoreForm({ pdfText: 'Resume', jobDescription: JD }));
   assert.equal(status, 503);
   assert.match(body.error, /unavailable/);
+});
+
+test('POST /api/score returns 502 when labd sends a body without message.content', async () => {
+  for (const reply of [() => new Response('<html>oops</html>'), () => Response.json({ credits: {} })]) {
+    labdResponse = reply;
+    const { status } = await postScore(scoreForm({ pdfText: 'Resume', jobDescription: JD }));
+    assert.equal(status, 502);
+  }
 });
 
 test('POST /api/score asks the user to wait when labd rate-limits', async () => {
@@ -117,6 +162,7 @@ test('POST /api/score returns 503 without calling labd when the key is missing',
   const { status } = await postScore(scoreForm({ pdfText: 'Resume', jobDescription: JD }));
   assert.equal(status, 503);
   assert.equal(labdCalls.length, 0);
+  assert.match(console.error.mock.calls[0].arguments[0], /LABD_AI_KEY is not set/);
 });
 
 test('POST /api/score rejects a short JD without calling labd', async () => {
@@ -134,6 +180,7 @@ test('POST /api/score rejects a JD over 20,000 characters', async () => {
   );
   assert.equal(status, 400);
   assert.match(body.error, /too long/);
+  assert.equal(labdCalls.length, 0);
 });
 
 test('POST /api/score rejects a missing job description', async () => {

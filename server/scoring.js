@@ -5,6 +5,16 @@ const labd = require('./labd');
 
 const MAX_RESUME_CHARS = 30000;
 
+// The endpoint is public, so cap what a reply can carry back; otherwise an
+// injected JD could turn it into a free general-purpose LLM on our key.
+const LIMITS = {
+  summaryChars: 600,
+  skillChars: 60,
+  suggestionChars: 300,
+  skills: 12,
+  suggestions: 4,
+};
+
 function buildPrompt(resumeText, jobDescription) {
   return `You are an experienced recruiter. Compare the resume to the job description and score how well the candidate fits the role.
 
@@ -30,12 +40,20 @@ function isStringArray(value) {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
+function capList(items, maxItems, maxChars) {
+  return [...new Set(items.map((item) => item.trim().slice(0, maxChars)))]
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
 // Returns the validated result, or null when the reply isn't the JSON we asked for.
 function parseScoreReply(content) {
-  const json = content.trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
+  // Models sometimes wrap the object in a code fence or a sentence of preamble.
+  const start = content.indexOf('{');
+  const end = content.lastIndexOf('}');
   let data;
   try {
-    data = JSON.parse(json);
+    data = JSON.parse(content.slice(start, end + 1));
   } catch {
     return null;
   }
@@ -51,10 +69,10 @@ function parseScoreReply(content) {
 
   return {
     score: data.score,
-    summary: data.summary,
-    matchedSkills: data.matchedSkills,
-    missingSkills: data.missingSkills,
-    suggestions: data.suggestions,
+    summary: data.summary.trim().slice(0, LIMITS.summaryChars),
+    matchedSkills: capList(data.matchedSkills, LIMITS.skills, LIMITS.skillChars),
+    missingSkills: capList(data.missingSkills, LIMITS.skills, LIMITS.skillChars),
+    suggestions: capList(data.suggestions, LIMITS.suggestions, LIMITS.suggestionChars),
   };
 }
 
