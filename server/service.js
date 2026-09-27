@@ -1,4 +1,8 @@
 const pdfParse = require('pdf-parse');
+const { scoreAgainstJobDescription, extractKeywords } = require('./scoring');
+
+const MIN_JD_KEYWORDS = 5;
+const MAX_JD_LENGTH = 20000;
 
 // Thrown for expected, client-facing failures; the controller maps
 // err.status and err.message onto the JSON response.
@@ -38,4 +42,26 @@ async function extractResume(file) {
   };
 }
 
-module.exports = { extractResume, ServiceError };
+async function scoreResume(file, jobDescription) {
+  if (jobDescription.length > MAX_JD_LENGTH) {
+    throw new ServiceError(
+      400,
+      `The job description is too long. Keep it under ${MAX_JD_LENGTH} characters.`
+    );
+  }
+  if (extractKeywords(jobDescription).length < MIN_JD_KEYWORDS) {
+    throw new ServiceError(
+      422,
+      'The job description is too short to score against. Paste the full posting.'
+    );
+  }
+
+  const resume = await extractResume(file);
+  return {
+    filename: resume.filename,
+    pages: resume.pages,
+    ...scoreAgainstJobDescription(resume.text, jobDescription),
+  };
+}
+
+module.exports = { extractResume, scoreResume, ServiceError };

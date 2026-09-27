@@ -18,4 +18,29 @@ async function uploadResume(req, res) {
   }
 }
 
-module.exports = { uploadResume };
+async function scoreResume(req, res) {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      error: 'No file uploaded. Send the PDF as form-data field "resume".',
+    });
+  }
+  const jobDescription = (req.body.jobDescription || '').trim();
+  if (!jobDescription) {
+    return res.status(400).json({
+      success: false,
+      error: 'No job description provided. Send it as form-data field "jobDescription".',
+    });
+  }
+
+  try {
+    const result = await service.scoreResume(req.file, jobDescription);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const status = err.status || 500;
+    const error = err.status ? err.message : 'Internal server error.';
+    return res.status(status).json({ success: false, error });
+  }
+}
+
+module.exports = { uploadResume, scoreResume };
