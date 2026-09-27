@@ -13,10 +13,11 @@ const STOPWORDS = new Set(
     'they this those through to too under until up upon us very via was we were what when ' +
     'where which while who whom why will with within without would you your yours ' +
     // Job-posting boilerplate that says nothing about the actual role.
-    'ability able apply applicant applicants candidate candidates company degree environment ' +
-    'excellent experience experienced familiarity good great ideal including join job knowledge ' +
-    'looking new opportunity plus preferred required requirement requirements responsibilities ' +
-    'responsible role skills strong team teams understanding using work working year years'
+    'ability able apply applicant applicants build building candidate candidates company degree ' +
+    'environment excellent experience experienced familiarity good great help hiring ideal ' +
+    'including join job knowledge looking make new opportunity plus preferred required ' +
+    'requirement requirements responsibilities responsible role run seeking set skills strong ' +
+    'team teams understanding use using want work working year years'
   ).split(' ')
 );
 
