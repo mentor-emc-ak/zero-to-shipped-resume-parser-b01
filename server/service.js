@@ -1,5 +1,6 @@
 const pdfParse = require('pdf-parse');
 const { scoreAgainstJobDescription } = require('./scoring');
+const db = require('./db');
 
 // Anything shorter can't describe a role, so don't spend labd credits on it.
 const MIN_JD_LENGTH = 100;
@@ -58,11 +59,19 @@ async function scoreResume(file, jobDescription) {
   }
 
   const resume = await extractResume(file);
-  return {
+  const result = {
     filename: resume.filename,
     pages: resume.pages,
     ...(await scoreAgainstJobDescription(resume.text, jobDescription)),
   };
+
+  // The score already cost a labd call, so a failed save is logged, not shown.
+  try {
+    await db.saveScore({ ...result, sizeBytes: resume.sizeBytes, resumeText: resume.text, jobDescription });
+  } catch (err) {
+    console.error(`[Mongo] failed to save score: ${err.message}`);
+  }
+  return result;
 }
 
 module.exports = { extractResume, scoreResume, ServiceError };

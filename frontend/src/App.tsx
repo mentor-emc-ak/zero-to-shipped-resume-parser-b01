@@ -185,7 +185,7 @@ function App() {
               </button>
               {isScoring && <p role="status" className="mt-3 text-[12px] text-[#85867d]">Reading your resume against the posting. This usually takes about 30 seconds.</p>}
               {error && <p role="alert" className="mt-3 text-[13px] font-medium text-[#bd4c34]">{error}</p>}
-              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[#85867d]"><ShieldCheck size={13} /> Your resume's text and the job description are sent to labd, our AI scoring provider. We don't store either.</p>
+              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[#85867d]"><ShieldCheck size={13} /> We save your resume's text, the job description and your score. Scoring runs on labd, our AI provider.</p>
             </form>
 
             <a href="#how-it-works" className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold text-[#55584f] transition-colors hover:text-[#d85e42]">
@@ -234,7 +234,7 @@ function App() {
         <section id="your-privacy" className="flex flex-col justify-between gap-4 rounded-[18px] bg-[#303a34] px-5 py-5 text-white sm:flex-row sm:items-center sm:px-7">
           <div className="flex items-start gap-3.5">
             <span className="grid size-9 shrink-0 place-items-center rounded-[12px] bg-white/10 text-[#f5c966]"><ShieldCheck size={18} /></span>
-            <div><h2 className="font-display text-[13px] font-bold">Your resume stays yours.</h2><p className="mt-1 text-[11px] leading-[1.7] text-white/65">We send your resume's text and the job description to labd, our AI scoring provider. We don't store your resume or your results.</p></div>
+            <div><h2 className="font-display text-[13px] font-bold">Your resume stays yours.</h2><p className="mt-1 text-[11px] leading-[1.7] text-white/65">We save your resume's text, the job description and your score. The text is sent to labd, our AI provider, for scoring. We never keep the PDF file itself.</p></div>
           </div>
           <a href="#upload" className="inline-flex shrink-0 items-center gap-2 text-[12px] font-semibold text-[#f5c966] transition-colors hover:text-white">Score your resume <ArrowUpRight size={15} /></a>
         </section>

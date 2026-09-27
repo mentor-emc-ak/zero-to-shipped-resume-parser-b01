@@ -4,6 +4,7 @@ const app = require('../index.js');
 const { buildPdf } = require('./helpers/pdf');
 const { parseScoreReply } = require('../scoring');
 const { LABD_CHAT_URL } = require('../labd');
+const db = require('../db');
 
 const JD =
   'We are hiring a backend engineer. You will build APIs in Node.js and TypeScript, ' +
@@ -57,6 +58,7 @@ let baseUrl;
 let server;
 let labdCalls;
 let labdResponse;
+let savedScores;
 const realFetch = globalThis.fetch;
 
 test.before(async () => {
@@ -69,6 +71,10 @@ test.before(async () => {
     labdCalls.push(init);
     return labdResponse();
   });
+  test.mock.method(db, 'saveScore', async (record) => {
+    savedScores.push(record);
+    return 'test-id';
+  });
   // The server logs [Labd]/[Scoring] lines on every failure path these tests exercise.
   test.mock.method(console, 'log', () => {});
   test.mock.method(console, 'error', () => {});
@@ -77,6 +83,7 @@ test.before(async () => {
 test.beforeEach(() => {
   process.env.LABD_AI_KEY = 'test-key';
   labdCalls = [];
+  savedScores = [];
   console.error.mock.resetCalls();
   labdResponse = () =>
     Response.json({ message: { role: 'assistant', content: JSON.stringify(REPLY) }, credits: { percentLeft: 90 } });
@@ -110,6 +117,29 @@ test('POST /api/score returns the labd score for a PDF and JD', async () => {
   const prompt = JSON.parse(labdCalls[0].body).messages[0].content;
   assert.match(prompt, /Backend engineer Node\.js AWS Docker/);
   assert.match(prompt, /own PostgreSQL schemas/);
+
+  assert.equal(savedScores.length, 1);
+  assert.equal(savedScores[0].score, REPLY.score);
+  assert.equal(savedScores[0].jobDescription, JD);
+  assert.match(savedScores[0].resumeText, /Backend engineer Node\.js AWS Docker/);
+});
+
+test('POST /api/score still returns the score when saving fails', async () => {
+  db.saveScore.mock.mockImplementationOnce(async () => {
+    throw new Error('connection refused');
+  });
+  const { status, body } = await postScore(scoreForm({ pdfText: 'Resume', jobDescription: JD }));
+  assert.equal(status, 200);
+  assert.equal(body.score, REPLY.score);
+  assert.ok(
+    console.error.mock.calls.some((call) => /\[Mongo\] failed to save score/.test(call.arguments[0]))
+  );
+});
+
+test('POST /api/score does not save when scoring fails', async () => {
+  labdResponse = () => new Response('No', { status: 402 });
+  await postScore(scoreForm({ pdfText: 'Resume', jobDescription: JD }));
+  assert.equal(savedScores.length, 0);
 });
 
 for (const labdStatus of [401, 402, 403]) {
