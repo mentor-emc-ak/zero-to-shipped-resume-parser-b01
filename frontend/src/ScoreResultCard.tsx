@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { Check, Info, X } from 'lucide-react'
+import { Check, Info, Lightbulb, X } from 'lucide-react'
 import type { ScoreResult } from './api'
 
 function verdictFor(score: number) {
@@ -8,17 +8,17 @@ function verdictFor(score: number) {
   return { label: 'Needs work', headline: 'Worth tailoring for this role.', tone: 'bg-[#f8e8df] text-[#b5543c]' }
 }
 
-function KeywordList({ title, keywords, matched }: { title: string; keywords: string[]; matched: boolean }) {
-  if (keywords.length === 0) return null
+function SkillList({ title, skills, matched }: { title: string; skills: string[]; matched: boolean }) {
+  if (skills.length === 0) return null
   const Icon = matched ? Check : X
   const chip = matched ? 'bg-[#e7efe7] text-[#4c6755]' : 'bg-[#f8e8df] text-[#a64c35]'
   return (
     <div>
-      <p className="mb-2 text-[11px] font-semibold text-[#55584f]">{title} <span className="font-normal text-[#98968d]">({keywords.length})</span></p>
+      <p className="mb-2 text-[11px] font-semibold text-[#55584f]">{title} <span className="font-normal text-[#98968d]">({skills.length})</span></p>
       <ul className="flex flex-wrap gap-1.5">
-        {keywords.map((keyword) => (
-          <li key={keyword} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${chip}`}>
-            <Icon size={11} strokeWidth={2.4} /> {keyword}
+        {skills.map((skill) => (
+          <li key={skill} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${chip}`}>
+            <Icon size={11} strokeWidth={2.4} /> {skill}
           </li>
         ))}
       </ul>
@@ -29,7 +29,7 @@ function KeywordList({ title, keywords, matched }: { title: string; keywords: st
 export function ScoreResultCard({ result }: { result: ScoreResult }) {
   const verdict = verdictFor(result.score)
   return (
-    <div className="relative rounded-[24px] border border-[#e9e4dc] bg-[#fffefa] p-5 shadow-[0_22px_70px_-42px_rgba(43,47,37,0.32)] sm:p-7" aria-live="polite">
+    <div className="relative rounded-[24px] border border-[#e9e4dc] bg-[#fffefa] p-5 shadow-[0_22px_70px_-42px_rgba(43,47,37,0.32)] sm:p-7">
       <div className="flex items-center justify-between gap-4 border-b border-[#eeeae3] pb-5">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-[#98968d]">Match against your JD</p>
@@ -49,19 +49,34 @@ export function ScoreResultCard({ result }: { result: ScoreResult }) {
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${verdict.tone}`}>{verdict.label}</span>
           <p className="mt-2.5 font-display text-[19px] font-bold leading-tight">{verdict.headline}</p>
           <p className="mt-1.5 text-[11px] text-[#898a80]">
-            {result.matchedKeywords.length} of {result.keywordCount} key terms found
+            {result.matchedSkills.length} of {result.matchedSkills.length + result.missingSkills.length} required skills found
           </p>
         </div>
       </div>
 
-      <div className="space-y-4 border-t border-[#eeeae3] pt-5">
-        <KeywordList title="Missing from your resume" keywords={result.missingKeywords} matched={false} />
-        <KeywordList title="Already covered" keywords={result.matchedKeywords} matched />
+      <p className="border-t border-[#eeeae3] pt-5 text-[12px] leading-[1.7] text-[#55584f]">{result.summary}</p>
+
+      <div className="mt-5 space-y-4">
+        <SkillList title="Missing from your resume" skills={result.missingSkills} matched={false} />
+        <SkillList title="Already covered" skills={result.matchedSkills} matched />
       </div>
+
+      {result.suggestions.length > 0 && (
+        <div className="mt-5">
+          <p className="mb-2 text-[11px] font-semibold text-[#55584f]">What to change</p>
+          <ul className="space-y-2">
+            {result.suggestions.map((suggestion) => (
+              <li key={suggestion} className="flex items-start gap-2 text-[11px] leading-[1.6] text-[#55584f]">
+                <Lightbulb size={13} className="mt-0.5 shrink-0 text-[#d2a83e]" /> {suggestion}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-5 flex items-start gap-2.5 rounded-[13px] bg-[#f8f3e9] px-3.5 py-3">
         <Info size={15} className="mt-0.5 shrink-0 text-[#c87d59]" />
-        <p className="text-[11px] leading-[1.65] text-[#777366]">The score is the share of the job description's key terms that appear in your resume, weighted by how often the posting repeats them. Add missing terms only where they're true for you.</p>
+        <p className="text-[11px] leading-[1.65] text-[#777366]">This score is an AI estimate of how well your resume fits this posting. Add missing skills only where they're true for you.</p>
       </div>
     </div>
   )

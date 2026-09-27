@@ -2,9 +2,10 @@ export type ScoreResult = {
   filename: string
   pages: number
   score: number
-  keywordCount: number
-  matchedKeywords: string[]
-  missingKeywords: string[]
+  summary: string
+  matchedSkills: string[]
+  missingSkills: string[]
+  suggestions: string[]
 }
 
 type ScoreResponse = ({ success: true } & ScoreResult) | { success: false; error: string }
@@ -34,7 +35,7 @@ export async function scoreResume(resume: File, jobDescription: string): Promise
   // Platform errors (e.g. Vercel's body-size limit) come back as HTML, not our JSON.
   const body: unknown = await res.json().catch(() => null)
   if (!isScoreResponse(body)) throw new Error(fallbackMessage(res.status))
-  if (!body.success) throw new Error(body.error)
+  if (!body.success) throw new Error(body.error || fallbackMessage(res.status))
 
   const { success: _success, ...result } = body
   return result
