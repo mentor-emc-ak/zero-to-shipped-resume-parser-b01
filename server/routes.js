@@ -27,8 +27,16 @@ router.get('/health', (req, res) => res.json({ status: 'ok' }));
 router.post('/api/resume', upload.single('resume'), controller.uploadResume);
 router.post('/api/score', upload.single('resume'), controller.scoreResume);
 
-// Multer errors (file too large, wrong type) land here.
+const authBody = express.json({ limit: '10kb' });
+router.post('/api/auth/signup', authBody, controller.signup);
+router.post('/api/auth/login', authBody, controller.login);
+router.get('/api/auth/me', controller.requireAuth, controller.me);
+
+// Multer errors (file too large, wrong type) and malformed JSON bodies land here.
 function uploadErrorHandler(err, req, res, next) {
+  if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') {
+    return res.status(400).json({ success: false, error: 'Send a JSON body with email and password.' });
+  }
   if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({
       success: false,

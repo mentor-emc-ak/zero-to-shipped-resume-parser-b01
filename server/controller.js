@@ -1,4 +1,5 @@
 const service = require('./service');
+const auth = require('./auth');
 
 async function uploadResume(req, res) {
   if (!req.file) {
@@ -45,4 +46,52 @@ async function scoreResume(req, res) {
   }
 }
 
-module.exports = { uploadResume, scoreResume };
+function sendServiceError(res, err) {
+  const status = err.status || 500;
+  const error = err.status ? err.message : 'Internal server error.';
+  if (!err.status) console.error(`[Auth] ${err.message}`);
+  return res.status(status).json({ success: false, error });
+}
+
+async function signup(req, res) {
+  try {
+    const result = await auth.signup(req.body?.email, req.body?.password);
+    return res.status(201).json({ success: true, ...result });
+  } catch (err) {
+    return sendServiceError(res, err);
+  }
+}
+
+async function login(req, res) {
+  try {
+    const result = await auth.login(req.body?.email, req.body?.password);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    return sendServiceError(res, err);
+  }
+}
+
+// Reads "Authorization: Bearer <jwt>" and sets req.userId, or answers 401.
+function requireAuth(req, res, next) {
+  const [scheme, token] = (req.get('Authorization') || '').split(' ');
+  try {
+    req.userId = scheme === 'Bearer' && token ? auth.verifyToken(token) : null;
+  } catch (err) {
+    return sendServiceError(res, err);
+  }
+  if (!req.userId) {
+    return res.status(401).json({ success: false, error: 'Log in to continue.' });
+  }
+  return next();
+}
+
+async function me(req, res) {
+  try {
+    const user = await auth.currentUser(req.userId);
+    return res.json({ success: true, user });
+  } catch (err) {
+    return sendServiceError(res, err);
+  }
+}
+
+module.exports = { uploadResume, scoreResume, signup, login, requireAuth, me };
