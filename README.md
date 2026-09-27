@@ -10,6 +10,7 @@ Put your labd key and MongoDB Atlas credentials in `server/.env`:
 LABD_AI_KEY=...
 MONGODB_USERNAME=...
 MONGODB_PASSWORD=...
+JWT_SECRET=...        # openssl rand -hex 32
 ```
 
 The npm scripts load it with `--env-file-if-exists`, which needs Node 22.9 or later.
@@ -27,7 +28,13 @@ Vite proxies `/api` to the server, so open http://localhost:5173.
 
 Every score is saved to the `scores` collection in the `resume_scorer` database, with the resume text and the job description.
 
-On Vercel, set `LABD_AI_KEY`, `MONGODB_USERNAME` and `MONGODB_PASSWORD` in the project's environment variables, and allow Vercel's IPs in Atlas network access. Secrets stay on the server.
+### Accounts
+
+`POST /api/auth/signup` and `POST /api/auth/login` take JSON `{ "email", "password" }` and return `{ token, user }`. Passwords need at least 8 characters. The token is an HS256 JWT signed with `JWT_SECRET` and valid for 7 days. `GET /api/auth/me` returns the user for `Authorization: Bearer <token>`.
+
+Users live in the `users` collection with a unique index on `email`. Passwords are stored as scrypt hashes. The frontend keeps the token in `localStorage`. Scoring does not require an account.
+
+On Vercel, set `LABD_AI_KEY`, `MONGODB_USERNAME`, `MONGODB_PASSWORD` and `JWT_SECRET` in the project's environment variables, and allow Vercel's IPs in Atlas network access. Secrets stay on the server.
 
 ## Tests
 
