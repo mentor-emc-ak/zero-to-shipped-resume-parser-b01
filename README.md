@@ -1,8 +1,15 @@
 # zero-to-shipped-resume-parser-b01
 
-Upload a PDF resume, paste a job description, and get a 0-100 match score with the JD keywords your resume covers and misses.
+Upload a PDF resume, paste a job description, and get a 0-100 fit score from labd, with the skills your resume covers and misses and suggested edits.
 
 ## Run locally
+
+Put your labd key in `server/.env`:
+
+```sh
+LABD_AI_KEY=...
+```
+
 
 ```sh
 cd server && npm install && npm run dev      # API on http://localhost:3000
@@ -13,9 +20,9 @@ Vite proxies `/api` to the server, so open http://localhost:5173.
 
 ## API
 
-`POST /api/score` takes multipart form data with `resume` (PDF, max 4 MB) and `jobDescription` (text). It returns `score`, `keywordCount`, `matchedKeywords` and `missingKeywords`.
+`POST /api/score` takes multipart form data with `resume` (PDF, max 4 MB) and `jobDescription` (text). It returns `score`, `summary`, `matchedSkills`, `missingSkills` and `suggestions`. A labd call takes about 30 seconds.
 
-The score is keyword coverage. It takes the 30 most repeated distinctive terms in the JD, weights each by how often the JD uses it, and reports the weighted share found in the resume.
+On Vercel, set `LABD_AI_KEY` in the project's environment variables. The key stays on the server.
 
 ## Tests
 
