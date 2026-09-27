@@ -25,7 +25,9 @@ async function scoreResume(req, res) {
       error: 'No file uploaded. Send the PDF as form-data field "resume".',
     });
   }
-  const jobDescription = (req.body.jobDescription || '').trim();
+  // A repeated or bracketed form field ("jobDescription[x]") parses to an array or object.
+  const rawJobDescription = req.body.jobDescription;
+  const jobDescription = typeof rawJobDescription === 'string' ? rawJobDescription.trim() : '';
   if (!jobDescription) {
     return res.status(400).json({
       success: false,
