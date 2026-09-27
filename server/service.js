@@ -1,7 +1,8 @@
 const pdfParse = require('pdf-parse');
-const { scoreAgainstJobDescription, extractKeywords } = require('./scoring');
+const { scoreAgainstJobDescription } = require('./scoring');
 
-const MIN_JD_KEYWORDS = 5;
+// Anything shorter can't describe a role, so don't spend labd credits on it.
+const MIN_JD_LENGTH = 100;
 const MAX_JD_LENGTH = 20000;
 
 // Thrown for expected, client-facing failures; the controller maps
@@ -49,7 +50,7 @@ async function scoreResume(file, jobDescription) {
       `The job description is too long. Keep it under ${MAX_JD_LENGTH} characters.`
     );
   }
-  if (extractKeywords(jobDescription).length < MIN_JD_KEYWORDS) {
+  if (jobDescription.length < MIN_JD_LENGTH) {
     throw new ServiceError(
       422,
       'The job description is too short to score against. Paste the full posting.'
@@ -60,7 +61,7 @@ async function scoreResume(file, jobDescription) {
   return {
     filename: resume.filename,
     pages: resume.pages,
-    ...scoreAgainstJobDescription(resume.text, jobDescription),
+    ...(await scoreAgainstJobDescription(resume.text, jobDescription)),
   };
 }
 
